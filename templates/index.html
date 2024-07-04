@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Company Search</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .company-metadata {
+            display: none;
+        }
+        .company-metadata.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Company Search</h1>
+    <form id="search-form">
+        <input type="text" id="company" name="company" placeholder="Enter company name" required>
+        <button type="submit">Search</button>
+    </form>
+    <div id="results">
+        <h2>Current Customers</h2>
+        <ul id="current-customers"></ul>
+        <h2>Potential Customers</h2>
+        <ul id="potential-customers"></ul>
+    </div>
+    <div class="company-metadata" id="company-metadata">
+        <h2>Company Metadata</h2>
+        <div id="metadata-content"></div>
+        <canvas id="financial-chart"></canvas>
+    </div>
+    <script>
+        $('#search-form').on('submit', function(e) {
+            e.preventDefault();
+            const company = $('#company').val();
+            $.post('/search', { company: company }, function(data) {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                $('#current-customers').empty();
+                $('#potential-customers').empty();
+                data.current_customers.forEach(function(cust) {
+                    $('#current-customers').append(`<li><a href="#" class="company-link" data-company="${cust}">${cust}</a></li>`);
+                });
+                data.potential_customers.forEach(function(cust) {
+                    $('#potential-customers').append(`<li><a href="#" class="company-link" data-company="${cust}">${cust}</a></li>`);
+                });
+            });
+        });
+
+        $(document).on('click', '.company-link', function(e) {
+            e.preventDefault();
+            const company = $(this).data('company');
+            $.get(`/metadata/${company}`, function(data) {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                $('#company-metadata').addClass('active');
+                $('#metadata-content').html(`
+                    <p><strong>Company:</strong> ${data.company}</p>
+                    <p><strong>ESG Data:</strong></p>
+                    <ul>
+                        <li>Environmental Score: ${data.esg.Environmental_Score}</li>
+                        <li>Social Score: ${data.esg.Social_Score}</li>
+                        <li>Governance Score: ${data.esg.Governance_Score}</li>
+                        <li>Overall ESG Score: ${data.esg.Overall_ESG_Score}</li>
+                    </ul>
+                    <p><strong>Chart:</strong></p>
+                    <img src="data:image/png;base64,${data.chart}" alt="Financial Chart">
+                `);
+
+                const ctx = document.getElementById('financial-chart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.financials.map(f => f.Year),
+                        datasets: [
+                            {
+                                label: 'Revenue',
+                                data: data.financials.map(f => f.Revenue),
+                                borderColor: 'rgba(75, 192, 192, 1)',
+                                borderWidth: 1
+                            },
+                            {
+                                label: 'Net Income',
+                                data: data.financials.map(f => f.Net_Income),
+                                borderColor: 'rgba(153, 102, 255, 1)',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
